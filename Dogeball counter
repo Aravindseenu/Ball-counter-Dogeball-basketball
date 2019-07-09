@@ -1,0 +1,245 @@
+/*coded by Aravindseenu @AK and vyass
+ * code to count number of ball counter during a game
+ * the score can be resetted and highested score will be displayed after each game
+ */
+#include <SPI.h>        //SPI.h must be included as DMD is written by SPI (the IDE complains otherwise)
+#include <DMD.h>        
+#include <TimerOne.h>   
+#include "SystemFont5x7.h"
+#include "Arial_black_16.h"
+#include <EEPROM.h>
+
+#define s1            3
+#define s2            4
+const int buttonPin = 5;
+int game = 0; 
+
+#define DISPLAYS_ACROSS 1
+#define DISPLAYS_DOWN 1
+DMD dmd(DISPLAYS_ACROSS, DISPLAYS_DOWN);
+int address = 0;
+byte value;
+int state = 0;
+int counter = 0;
+int highScore ;
+void ScanDMD()
+{ 
+  dmd.scanDisplayBySPI();
+}
+
+void setup() {
+                                        //initialize TimerOne's interrupt/CPU usage used to scan and refresh the display
+   Timer1.initialize( 5000 );           //period in microseconds to call ScanDMD. Anything longer than 5000 (5ms) and you can see flicker.
+   Timer1.attachInterrupt( ScanDMD );   //attach the Timer1 interrupt to ScanDMD which goes to dmd.scanDisplayBySPI()
+   
+   //clear/init the DMD pixels held in RAM
+   dmd.clearScreen( true );   //true is normal (all pixels off), false is negative (all pixels on)
+   Serial.begin(9600);
+   pinMode(s1 && s2, INPUT);
+   dmd.selectFont(Arial_Black_16);
+    pinMode(buttonPin, INPUT);    
+}
+
+int count = 0;
+int prevState = 0;
+int longPress = 0;
+void loop() 
+{
+ 
+  if (digitalRead(buttonPin) == HIGH && prevState == 0)
+  {
+      //count++;
+      prevState = 1;
+      //delay(500);
+  }
+  else if(digitalRead(buttonPin) == HIGH && prevState == 1)
+  {
+    longPress ++;
+    delay(10);
+    
+  }
+  if (digitalRead(buttonPin)== LOW && prevState == 1)
+  {
+     Serial.println("low and state 1");
+    if(longPress >= 300)
+    {
+      
+    }
+    else 
+    {
+      game = 1;
+      Serial.println("game on");
+    }
+    prevState = 0;
+  }
+  if(longPress >= 300)
+  {
+      Serial.println("Reseted");
+      prevState = 0;
+      longPress = 0;
+      EEPROM.write(1,0); // reseting high score 
+      dmd.drawMarquee("---reseted---",13,(32*DISPLAYS_ACROSS)-1,0);
+      long start=millis();
+      long timer=start;
+      boolean ret=false;
+      while(!ret){
+       if ((timer+30) < millis()) {
+         ret=dmd.stepMarquee(-1,0);
+         timer=millis();
+       }
+      }
+      //delay(1000);
+      
+  }
+  Serial.println(longPress);
+  
+  
+  
+  //Serial.print(prevState); Serial.print(":count:"); Serial.println(count);
+
+   if(game == 0)
+  {
+    char printHighScore[1] = "";
+    strcpy(printHighScore, String(EEPROM.read(1)).c_str());
+    const char pHs[30] = "DODGE BALL ";
+    strcat(pHs, "HIGH SCORE:");
+    strcat(pHs, printHighScore);
+    //Serial.println(pHs);
+    dmd.drawMarquee(pHs,26,(32*DISPLAYS_ACROSS)-1,1);
+    
+    long start=millis();
+    long timer=start;
+    boolean ret=false;
+    
+      //Serial.print("  HIGH SCORE : ");Serial.println(const char(printHighScore); 
+     // dmd.drawMarquee(highScore ,10,(32*DISPLAYS_ACROSS)-1,1);
+
+     while(!ret)
+        {
+          /* if(digitalRead(s1) == LOW&& digitalRead(s2) == LOW)
+           {
+              
+                        
+              dmd.clearScreen( true );
+              counter=1;
+              char chk[10];
+              strcpy(chk, String(counter).c_str());
+              dmd.drawString( 11,  1, chk, 3, GRAPHICS_NORMAL );
+            //  delay(500);
+              break;
+           }
+           */
+           if(digitalRead(5) == 1)
+           {
+            //game = 1;
+            break;
+           }
+          if ((timer+30) < millis()  ) {
+             ret=dmd.stepMarquee(-1,0);
+             timer=millis();
+           }
+    }  //dmd.clearScreen( true );
+  }
+
+  else if( game == 1)
+  {       
+                     dmd.clearScreen( true );
+         // Serial.println("gamwe =1-------------------------------------------");
+
+         counter = 0;
+         
+
+        while(digitalRead(buttonPin) == HIGH)
+        {
+          delay(10);
+          Serial.println("________________chking");
+        }
+                 
+            
+         while( game == 1  && digitalRead(5) == LOW) 
+        {   
+           
+           // Serial.println("________________chking____playing main loop____________________________-");
+              //Serial.print(digitalRead(s1));Serial.print(digitalRead("--"));Serial.println(digitalRead(s2));
+              if( digitalRead(s1) == 1 && digitalRead(s2) == 1 )
+              {
+              //  Serial.print("C2");
+                state = 0;
+              }
+              if( digitalRead(s1) == 0 && digitalRead(s2) == 1) 
+              {
+                
+              //  Serial.println( "C1");
+                state = 1;
+              }
+              
+              if( digitalRead(s1) == 0 && digitalRead(s2) == 0  && state == 1)   // 1- not sensed // 0- sensed
+              {
+               // Serial.print("C2");
+                state = 2;
+              }
+          
+                            
+              if( digitalRead(s1) == 1 && digitalRead(s2) == 0 && state == 2 )
+              {
+                state = 0;
+                counter = counter+1;
+                dmd.clearScreen( true );
+              }
+              displayScore(counter);
+            
+              
+        }
+        game = 0;
+        while(digitalRead(buttonPin) == HIGH)
+        {
+          delay(10);
+         
+        }
+        Serial.println("        ");
+        for(int i = 0 ; i <= 5 ; i++)
+        {
+           dmd.drawTestPattern( PATTERN_ALT_0 );
+            displayScore(counter);
+            delay(500);
+            dmd.clearScreen( true );
+            delay(500);
+        }
+
+        
+        if(counter >= EEPROM.read(1))
+        {
+          Serial.println("HIgh Score");
+          //delay(2000);
+          EEPROM.write(1,counter);
+        }
+       
+          
+      
+        
+  }
+
+  
+     
+
+}
+  
+
+
+void displayScore(int t_counter)
+{ 
+  char chk[1];
+  strcpy(chk, String(t_counter).c_str());
+  if(t_counter <= 9)
+                {
+                   dmd.drawString( 11,  1, chk, 3, GRAPHICS_NORMAL );
+                }
+                else if (counter <=99)
+                {
+                   dmd.drawString( 7,  1, chk, 3, GRAPHICS_NORMAL );
+                }
+                else
+                {
+                   dmd.drawString( 3,  1, chk, 3, GRAPHICS_NORMAL );
+                }
+}
